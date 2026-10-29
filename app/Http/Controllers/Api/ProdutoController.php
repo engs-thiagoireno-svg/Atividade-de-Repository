@@ -5,17 +5,36 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProdutoResource;
 use App\Models\Produto;
+use App\Services\ProdutoService;
 use Illuminate\Http\Request;
 
 class ProdutoController extends Controller
 {
+    public function __construct(
+        private ProdutoService $service
+    ) {}
+
     /**
      * Display a listing of the resource.
      */
-    public function index()
-    {
-        return ProdutoResource::collection(Produto::latest()->paginate(10));
-    }
+    // public function index()
+    // {
+    //     return ProdutoResource::collection(Produto::latest()->paginate(10));
+    // }
+
+    public function index(Request $request)
+{
+$filtros = [
+    'search'         => $request->query('search'),
+    'preco_min'      => $request->query('preco_min'),
+    'preco_max'      => $request->query('preco_max'),
+    'descricao'      => $request->query('descricao'),
+    'quantidade_min' => $request->query('quantidade_min'),
+];
+
+    return ProdutoResource::collection
+    ($this->service->listar($filtros));
+}
 
     /**
      * Store a newly created resource in storage.
@@ -25,12 +44,13 @@ class ProdutoController extends Controller
         $dados = $request->validate([
             'nome' => ['required', 'string', 'max:255'],
             'descricao' => 'nullable|string',
+            'preco_custo' => ['required', 'numeric', 'min:0'],
             'preco' => ['required', 'numeric', 'min:0'],
             'quantidade' => 'sometimes|integer|min:0',
         ]);
 
-        // Cria o Produto (Model)
-        $produto = Produto::create($dados);
+        // Cria o Produto (Service)
+        $produto = $this->service->create($dados);
 
         // Retorna um novo Recurso a cada requisição
         return new ProdutoResource($produto);
@@ -52,11 +72,12 @@ class ProdutoController extends Controller
         $dados = $request->validate([
             'nome' => ['sometimes', 'string', 'max:255'],
             'descricao' => 'nullable|string',
+            'preco_custo' => ['sometimes', 'numeric', 'min:0'],
             'preco' => ['sometimes', 'numeric', 'min:0'],
             'quantidade' => 'sometimes|integer|min:0',
         ]);
 
-        $produto->update($dados);
+        $produto = $this->service->update($produto, $dados);
 
         return new ProdutoResource($produto);
     }
@@ -64,8 +85,10 @@ class ProdutoController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(Produto $produto)
     {
-        //
+        $this->service->delete($produto);
+
+        return response()->noContent();
     }
 }
